@@ -1,0 +1,140 @@
+---
+output: html_notebook
+---
+
+## A investigar: ¿Cual es la diferencia en mortalidad infantil entre el sur y el norte de la Ciudad Autónoma de Buenos Aires?
+
+Buenos Aires es una ciudad que desde hace décadas presenta una marcada polarización entre sus barrios del sur, relativamente menos desarrollados, y los del norte donde el nivel socioeconómico y la calidad de vida son mayores. <br>
+Uno de los aspectos más lamentables de la disparidad norte-sur, y sin duda de los que más polémica y acusaciones cruzadas ha generado, es la diferencia en la tasa de mortalidad infantil de acuerdo a la región de la ciudad. <br>
+- ¿Qué tan grande es esa diferencia? <br>
+- ¿Cómo se distribuye geográficamente? <br>
+
+```{r}
+options(encoding = 'UTF-8', warn = -1)
+library(readr)
+library(tidyverse)
+library(sf)
+```
+
+
+```{r}
+mortalidad <- read_csv('https://bitsandbricks.github.io/data/mortalidad_infantil_caba_2016.csv')
+mortalidad
+```
+
+```{r}
+dim(mortalidad)
+```
+`dim()` nos da las dimensiones del dataframe (cantidad de filas y columnas).
+<br>
+
+```{r}
+names(mortalidad)
+```
+`names()` nos dice como se llaman las columnas del dataframe (que en general representan variables).
+<br><br>
+
+#### **Veamos a cuanto asciende la tasa de mortalidad infantil en cada comuna durante 2016**
+
+```{r}
+ggplot(mortalidad) + geom_col(aes(
+  x = factor(Comuna), 
+  y = Tasa2016))
+```
+Ejecutar sólo `ggplot(mortalidad)` nos devuelve un gráfico vacío; la gracia está en agregar una o más capas especificando cómo queremos mostrar los datos. Estas capas se agregan con un signo `+`.
+<br>
+En nuestro ejemplo, `geom_col()` crea columnas cuya posición en el eje de las x depende de la variable **“Comuna”**, mientas que la altura (posición en el eje de las y) depende del valor de la variable **“Tasa2016”**. 
+
+> En cuanto al gráfico que hemos creado, podemos observar que entre las 15 comunas en la ciudad, la tasa de mortalidad tiene un rango que va de un poco menos de 2,5 a un poco más de 12,5 (esto es, muertes antes del año de vida por cada 10.000 nacimientos). <br>
+Pero no se distingue aquello que queríamos comprender: la diferencia entre el norte y el sur de la ciudad. Necesitamos contexto geográfico.
+
+
+```{r}
+comunas <- st_read('https://bitsandbricks.github.io/data/CABA_comunas.geojson')
+```
+
+```{r}
+names(comunas)
+```
+
+```{r}
+ggplot(comunas) + geom_sf(aes(fill = comunas))
+```
+Dentro de `aes()` usé el parámetro “fill” (relleno en inglés) para pedirle a ggplot que llene cada polígono con un color distinto de acuerdo al campo “comunas”. <br><br>
+Aprovechando que tenemos un mapa, deberíamos clasificar las comunas entre las que pertenecen al norte y las que pertenecen al sur de la ciudad. No hay una línea divisoria oficial, pero la traza de la Avenida Rivadavia suele ser tomada como frontera: Rivadavia es la “divisoria simbólica del Norte y el Sur de la Ciudad, con sus diferencias de desarrollo”. <br><br>
+Por esas casualidades de la vida, se tiene un archivo geográfico que contiene la línea que dibuja a avenida Rivadavia al atravesar la ciudad.
+
+```{r}
+rivadavia <- st_read('https://bitsandbricks.github.io/data/avenida_rivadavia.geojson')
+```
+
+```{r}
+ggplot(comunas) +
+geom_sf(aes(fill = comunas)) +
+geom_sf(data = rivadavia, color = "red")
+```
+
+```{r}
+nueva_columna <- c("Sur", "Norte", "Sur", "Sur", "Sur", "Norte", "Sur", "Sur", "Sur", "Norte", "Norte", "Norte", "Norte", "Norte", "Norte")
+
+nueva_columna
+```
+
+```{r}
+comunas <- mutate(comunas, ubicacion = nueva_columna)
+head(comunas)
+```
+Podemos armar una sucesión de 15 “etiquetas” según el punto cardinal que le toca a cada comuna. El comando en R que “une” valores en conjunto se llama c() (viene de “combine”, “combinar”), y permite definir una lista de valores. <br> <br>
+Mejor dicho, un “vector” de valores; en el mundo de la programación, se usa la palabra vector cuando se combinan elementos del mismo tipo, y “lista” cuando se combina una variedad de clases: en el mismo conjunto números, textos, y otros tipos de objeto más complejos. Por ahora, no nos preocupemos por eso.
+<br>
+```{r}
+ggplot(comunas) +
+geom_sf(aes(fill = ubicacion)) +
+geom_sf(data = rivadavia, color = "red")
+```
+
+```{r}
+mortalidad <- mutate(mortalidad, ubicación = nueva_columna)
+                         
+head(mortalidad)
+```
+<br><br>
+
+#### **El veredicto final**
+
+```{r}
+ggplot(comunas) +
+geom_sf(aes(fill = mortalidad$Tasa2016)) +
+geom_sf(data = rivadavia, color = "red") +
+scale_fill_distiller(palette = "Spectral")
+```
+Aprovechemos entonces nuestra data limpia y ordenada, para producir un mapa que señale con color el nivel de mortalidad. Armamos un ggplot con una capa que muestra las comunas, cuyo color interior (“fill”) depende del valor de la mortalidad. Le sumamos una capa con la traza de la Avenida Rivadavia, nuestra referencia de posición, y por último definimos la paleta de colores a usar en el fill, eligiendo una llamada “Spectral”, que va del azul al rojo y es muy usada cuando se quiere resaltar la divergencia de una variable.
+
+```{r}
+validUTF8("ubicación")
+
+ggplot(mortalidad) +
+geom_col(aes(x = Comuna, y = Tasa2016, fill = ubicación)) +
+labs(title = "Mortalidad infantil en la Ciudad Autónoma de Buenos Aires",
+subtitle = "Año 2016",
+y = "tasa")
+```
+
+```{r}
+comunas_al_sur <- filter(mortalidad, ubicación == "Sur")
+
+comunas_al_norte <- filter(mortalidad, ubicación == "Norte")
+
+# calculamos la diferencia entre el promedio de mortalidad de unas y otras.
+mean(comunas_al_sur$Tasa2016) / mean(comunas_al_norte$Tasa2016)
+```
+
+#### ¿Cuál es la diferencia en mortalidad infantil entre el sur y el norte de la Ciudad Autónoma de Buenos Aires?
+
+En base a lo que descubrimos, vamos a responder en forma sucinta. <br><br>
+
+En el año 2016, la tasa de mortalidad infantil en todo los barrios del sur es más alta que en cualquier de los del norte.<br><br>
+
+Para los nacidos en 2016 de padres que viven en el sur de la ciudad, la posibilidad de morir antes del primer año es, en promedio, el doble que la de aquellos con padres que residen al norte.<br><br>
+
+Por supuesto, con esto no puede darse por cerrado el tema; hay muchas facetas que deberíamos analizar para comenzar a entender un fenómeno social de tal complejidad. Por ejemplo, ¿Cómo es la evolución en el tiempo de la brecha norte/sur - se mantiene igual, decrece, aumenta? ¿Qué otros factores están correlacionados con la disparidad, más allá del geográfico?<br><br>
