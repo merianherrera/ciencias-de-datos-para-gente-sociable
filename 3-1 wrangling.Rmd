@@ -1,0 +1,208 @@
+---
+output: html_notebook
+---
+
+## **Primeros pasos al examinar un conjunto de datos nuevo**
+
+Vamos a practicar usando los registros del Sistema Único de Atención Ciudadana (SUACI) de la Ciudad Autónoma de Buenos Aires. El SUACI es el repositorio donde se integran las solicitudes y reclamos que los ciudadanos presentan a la ciudad por distintos canales: en persona, por teléfono o usando la aplicación BA 147.
+
+```{r}
+options(encoding = 'UTF-8', warn = -1)
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+atencion_ciudadano <- read.csv("http://bitsandbricks.github.io/data/gcba_suaci_barrios.csv")
+str(atencion_ciudadano)
+```
+La funcion `str()` nos muestra la estructura del dataframe.
+
+```{r}
+summary(atencion_ciudadano)
+```
+
+```{r}
+levels(atencion_ciudadano$BARRIO)
+```
+
+## **Cruzando variables: la operación join**
+
+Hemos visto que los registros de atención al ciudadano incluyen una columna con el barrio, que es la única variable relacionada con la geografía. Si nuestra unidad de análisis fuera la columna en lugar del barrio, necesitaríamos agrega la columna correspondiente. En este caso, estamos de suerte porque una tabla con los barrios de la Ciudad de Buenos Aires y la comuna a la que pertenecen es fácil de conseguir. Con esa tabla en nuestro poder, ya tenemos las piezas necesarias para el cruce de datos.
+
+```{r}
+barrios_comunas <- read.csv("http://bitsandbricks.github.io/data/barrios_comunas.csv")
+barrios_comunas
+```
+
+```{r}
+atencion_ciudadano <- left_join(atencion_ciudadano, barrios_comunas)
+head(atencion_ciudadano)
+```
+
+```{r}
+write.csv(atencion_ciudadano, "atencion_ciudadano.csv", row.names = FALSE)
+```
+
+```{r}
+atencion_ciudadano <- read.csv("atencion_ciudadano.csv")
+```
+
+## **Transformando los datos**
+
+Para hacer todo esto, y mucho más, vamos a aprender funciones que representan cinco verbos básicos para la transformación de datos: <br>
+
+- `select()`: seleccionar -elegir- columnas por su nombre <br>
+- `filter()`: filtrar, es decir quedarse sólo con las filas que cumplan cierta condición <br>
+- `arrange()`: ordenar las filas de acuerdo a su contenido o algún otro índice <br>
+- `mutate()`: mutar -cambiar- un dataframe, modificando el contenido de sus columnas o creando columnas (es decir, variables) nuevas <br>
+- `summarise()`: producir sumarios -un valor extraído de muchos, por ejemplo el promedio- con el contenido de las columnas <br>
+
+
+### Seleccionar columnas con select()
+
+```{r}
+# seleccionar solo las que contienen el período y el total, las seleccionamos por nombre
+seleccion <- select(atencion_ciudadano, PERIODO, total)
+head(seleccion)
+```
+
+```{r}
+# seleccionar por contiguidad
+seleccion <- select(atencion_ciudadano, RUBRO:BARRIO)
+head(seleccion)
+```
+
+```{r}
+# seleccionar por omision
+seleccion <- select(atencion_ciudadano, -RUBRO)
+head(seleccion)
+```
+
+```{r}
+# Podemos seleccionar por omision de un rango de columnas contiguas
+seleccion <- select(atencion_ciudadano, -(TIPO_PRESTACION:total))
+head(seleccion)
+```
+
+```{r}
+seleccion <- select(atencion_ciudadano, -RUBRO, -BARRIO)
+head(seleccion)
+```
+<br>
+
+### Filtrar columnas con filter()
+
+```{r}
+seleccion <- filter(atencion_ciudadano, BARRIO == "RETIRO")
+head(seleccion)
+```
+
+#### Comparaciones
+
+* `==`   igual a <br>
+* `!=`   no igual a  <br>
+* `>`    mayor a  <br>
+* `>=`   mayor o igual a <br> 
+* `<`    menor a <br> 
+* `<=`   menor o igual a <br> 
+
+```{r}
+seleccion <- filter(atencion_ciudadano, total > 100)
+head(seleccion)
+```
+
+```{r}
+seleccion <- filter(atencion_ciudadano, BARRIO == "RETIRO" | BARRIO == "PALERMO")
+head(seleccion)
+```
+
+### Ordenar filas con arrange()
+
+```{r}
+ordenado <- arrange(atencion_ciudadano, total)
+head(ordenado)
+```
+
+```{r}
+ordenado <- arrange(atencion_ciudadano, total, BARRIO)
+head(ordenado)
+```
+
+```{r}
+ordenado <- arrange(atencion_ciudadano, desc(total))
+
+head(ordenado, 200)
+```
+
+### Agregar nuevas variables con mutate()
+
+```{r}
+circulos <- data.frame(nombre = c("Círculo 1", "Círculo 2", "Círculo 3"),
+                       tamaño = c("Pequeño", "Mediano", "Grande"),
+                       radio  = c(1, 3, 5))
+circulos
+```
+
+```{r}
+mutate(circulos, area = 3.1416 * radio^2)
+```
+
+```{r}
+atencion_ciudadano <- mutate(atencion_ciudadano,
+                             ANNO = substr(PERIODO, 1, 4),
+                             MES = substr(PERIODO, 5, 6))
+head(atencion_ciudadano, 200) 
+```
+
+### Extraer sumarios con summarise()
+
+```{r}
+summarise(atencion_ciudadano, promedio = mean(total))
+```
+
+```{r}
+agrupado <- group_by(atencion_ciudadano, ANNO)
+summarise(agrupado, promedio_totales = mean(total))
+```
+
+```{r}
+agrupado <- group_by(atencion_ciudadano, ANNO, MES)
+sumario <- summarise(agrupado, promedio = mean(total))
+head(sumario)
+```
+
+```{r}
+# 1. Filtramos los datos para aislar los registros del 2013;
+solo2013 <- filter(atencion_ciudadano, ANNO == 2013)
+# 2. agrupamos por Barrio;
+solo2013_agrupado_barrio <- group_by(solo2013, BARRIO)
+# 3. hacemos un sumario, creando una variable resumen que contiene la suma de los registros para cada barrio;
+total_por_barrio_2013 <- summarise(solo2013_agrupado_barrio, total = sum(total))
+# 4. los ordenamos en forma descendiente,
+total_por_barrio_2013_ordenado <- arrange(total_por_barrio_2013, desc(total))
+# 5. mostramos sólo los primeros 5 (esto se puede hacer con la función `head()`, aclarando cuantas filas queremos ver)
+head(total_por_barrio_2013_ordenado, 5)
+```
+
+```{r}
+atencion_ciudadano %>% 
+    filter(ANNO == 2013) %>% 
+    group_by(BARRIO) %>% 
+    summarise(total = sum(total)) %>% 
+    arrange(desc(total)) %>% 
+    head(5)
+```
+
+```{r}
+atencion_ciudadano %>% filter(ANNO == 2013)
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
