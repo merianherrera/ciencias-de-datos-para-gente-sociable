@@ -6,7 +6,7 @@
 <center><img src="logo_libro.png" width="500"/></center>
 
 <br>
-Este es un repositorio de los ejercicio practicos que se pueden encontrar en el libro Ciencia de Datos para Gente Sociable escrito por Antonio Vazquez Brust.
+Este es un repositorio de los ejercicios practicos que se pueden encontrar en el libro Ciencia de Datos para Gente Sociable escrito por Antonio Vazquez Brust.
 
 <br>
 
