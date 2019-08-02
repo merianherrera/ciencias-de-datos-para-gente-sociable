@@ -1,0 +1,179 @@
+---
+output: html_notebook
+---
+
+## Visualizacion
+
+```{r}
+library(tidyverse)
+```
+
+#### Scatter Plot
+
+```{r}
+atencion_ciudadano <- read.csv("http://bitsandbricks.github.io/data/gcba_suaci_comunas.csv")
+head(atencion_ciudadano, 300)
+```
+
+```{r}
+contactos_por_comuna <- atencion_ciudadano %>% 
+    group_by(COMUNA) %>% 
+    summarise(miles_contactos = sum(total) / 1000 )
+
+contactos_por_comuna
+```
+
+```{r}
+habitantes <- read.csv("http://bitsandbricks.github.io/data/gcba_pob_comunas_17.csv")
+
+habitantes
+```
+
+```{r}
+contactos_por_comuna <- contactos_por_comuna %>% left_join(habitantes)
+
+contactos_por_comuna
+```
+
+```{r}
+ggplot(contactos_por_comuna) + geom_point(aes(x = POBLACION, y = miles_contactos))
+```
+
+Lo que hicimos fue pedirle a ggplot que dibuje un punto por cada fila (representando a cada comuna), con la posición en el eje de las x según su población, y en el eje de las y según la cantidad de contactos registrados. Estas referencias estéticas (aesthetics en inglés) son las que van dentro de la función aes() en geom_point(aes(x = POBLACION, y = miles_contactos)). <br>
+
+```{r}
+ggplot(contactos_por_comuna) + 
+    geom_point(aes(x = POBLACION, y = miles_contactos, color = factor(COMUNA)))
+```
+
+En ese caso, no es tan fácil discernir cuál es cuál, pero mirando con cuidado descubrimos que la comuna 1 es el outlier, el valor fuera de lo común. Lo que nos pasa aquí es que tenemos demasiadas categorías, con lo cual cada una tiene su propio color pero el rango cromático no alcanza para darle a cada una un tono bien distinto al de las demás. <br>
+
+```{r}
+ggplot(contactos_por_comuna) +
+    geom_label(aes(x = POBLACION, y = miles_contactos, label = factor(COMUNA)))
+```
+<br>
+Para dejar aún más clara la diferencia de reclamos entre comunas, podríamos usar el tamaño (size) de cada punto para representar esa variable, además de su altura en el gráfico.
+<br>
+```{r}
+ggplot(contactos_por_comuna) + 
+    geom_point(aes(x = POBLACION, y = miles_contactos, size = miles_contactos), color = "darkolivegreen4")
+```
+
+### Facetado
+
+```{r}
+summary(atencion_ciudadano)
+```
+
+```{r}
+contactos_por_comuna_y_tipo <- atencion_ciudadano %>% 
+    group_by(COMUNA, TIPO_PRESTACION) %>% 
+    summarise(miles_contactos = sum(total) / 1000 ) %>% 
+    left_join(habitantes)
+
+head(contactos_por_comuna_y_tipo)
+```
+
+```{r}
+ggplot(contactos_por_comuna_y_tipo) + 
+    geom_point(aes(x = POBLACION, y = miles_contactos)) +
+    facet_wrap(~TIPO_PRESTACION)
+```
+
+Producimos un scatterplot igual que antes, y le agregamos una capa adicional con facet_wrap(). La variable a “facetar”, la que recibirá un gráfico por cada una de sus categorías, siempre se escribe a continuación del signo ~; en nuestro caso, queda como ~TIPO_PRESTACION. El simbolillo en cuestión denota lo que en R se denomina una fórmula y ya nos lo cruzaremos de nuevo, pero por ahora no le prestamos más atención. <br>
+
+### Gráficos de barras
+
+```{r}
+ggplot(atencion_ciudadano) +
+geom_bar(aes(x = BARRIO, weight = total))
+
+options(scipen = 999)
+```
+
+Tenemos dos problemas. El primero es que los valores en el eje de las y son grandes, y R nos quiere hacer un favor expresándolos en notación científica. La notación científica es práctica para ahorrar espacio, pero no queda vien en visualizaciones. Para pedirle que no lo haga mas, usamos `options(scipen = 999)`. <br>
+
+```{r}
+ggplot(atencion_ciudadano) +
+    geom_bar(aes(x = BARRIO, weight = total)) +
+    coord_flip()
+```
+
+```{r}
+ggplot(atencion_ciudadano) +
+    geom_bar(aes(x = BARRIO, weight = total, fill = TIPO_PRESTACION)) +
+    coord_flip()
+```
+
+```{r}
+ggplot(atencion_ciudadano) +
+    geom_bar(aes(x = TIPO_PRESTACION, weight = total, fill="pink")) 
+```
+
+<br>
+¿Y si mostramos el aporte de cada barrio al total global de cada tipo de contacto?
+<br>
+
+```{r}
+ggplot(atencion_ciudadano) +
+    geom_bar(aes(x = TIPO_PRESTACION, weight = total, fill = BARRIO))
+```
+
+<br>
+Quizás con un facetado por barrio…
+<br>
+
+```{r}
+ggplot(atencion_ciudadano) +
+    geom_bar(aes(x = TIPO_PRESTACION, weight = total)) +
+    facet_wrap(~BARRIO)
+```
+
+### Histogramas
+
+```{r}
+contactos_por_mes <- atencion_ciudadano %>% 
+    group_by(PERIODO) %>% 
+    summarise(gran_total = sum(total))
+
+head(contactos_por_mes)
+```
+
+```{r}
+ggplot(contactos_por_mes) + 
+    geom_histogram(aes(x = gran_total))
+```
+
+`geom_histogram()` divide el rango de valores en una cantidad arbitraria de segmentos iguales (“bins” en inglés) y cuenta cuantas observaciones caen en cada uno, cantidad que se representa con la altura de la columna en el eje de las y. <br>
+
+> En nuestro ejemplo, vemos que un mes mes en el que la cantidad de resgitros tiende a agurparse en torno a un valor típico de poco más de 60.000 por mes. En apenas un caso hubo mennos de 40.000 o más de 80.000.
+
+```{r}
+# Hacemos el agrupado y sumario de rigor
+contactos_por_mes_y_tipo <- atencion_ciudadano %>% 
+    group_by(PERIODO, TIPO_PRESTACION) %>% 
+    summarise(gran_total = sum(total))
+
+head(contactos_por_mes_y_tipo, 300)
+```
+
+```{r}
+ggplot(contactos_por_mes_y_tipo) + 
+    geom_histogram(aes(x = gran_total)) +
+    facet_wrap(~TIPO_PRESTACION)
+```
+
+### Ejemplo deun grafico preparado para compartir
+
+```{r}
+ggplot(atencion_ciudadano) +
+    geom_bar(aes(x = BARRIO, weight = total, fill = TIPO_PRESTACION)) +
+    coord_flip() +
+    labs(title = "Contactos realizados al Sistema Único de Atención Ciudadana",
+         subtitle = "Ciudad Autónoma de Buenos Aires, 2013 - 2015",
+         caption = "Fuente: portal de datos abiertos de la Ciudad - http://data.buenosaires.gob.ar",
+         x = "barrio",
+         y = "cantidad",
+         fill = "Motivo del contacto")
+```
