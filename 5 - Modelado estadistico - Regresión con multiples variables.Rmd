@@ -1,0 +1,36 @@
+---
+output: html_notebook
+---
+
+## **Modelado Estadistico**
+
+
+```{r}
+library(tidyverse)
+```
+
+### **Regresión con múltiples variables**
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
