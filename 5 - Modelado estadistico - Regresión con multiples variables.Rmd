@@ -12,25 +12,83 @@ library(tidyverse)
 ### **Regresión con múltiples variables**
 
 ```{r}
+data_mundial <- read.csv("https://bitsandbricks.github.io/data/gapminder.csv")
+summary(data_mundial)
+
+data_mundial_2007 <- data_mundial %>% filter(a..o == 2007)
+
 
 ```
 
 ```{r}
+modelo_exp_multiple <- lm(expVida ~ pobl + PBI_PC, data = data_mundial_2007)
 
+modelo_exp_multiple
 ```
+
+> * Cuando las demás variables se mantienen constantes (es decir, en países con PBI similar) el incremento de una unidad de población -un habitante- está asociado a un incremento de 0,000000007 años en la expectativa de vida del país… unas dos décimas de segundo. <br>
+* Cuando las demás variables se mantienen constantes (es decir, en países con población similar) el incremento de una unidad de PBI -un dólar per cápita- está asociado a un incremento de 0,00064 años en la expectativa de vida del país… un poco más de cinco horas y media. 
+
+<br>
+
+> Los países de mayores ingresos tiendan a ser aquellos cuyos habitantes viven más tiempo.
+
+<br>
+Veamos el top ten de países más poblados:
+<br>
+```{r}
+data_mundial_2007 %>% 
+    arrange(desc(expVida)) %>% 
+    head(n = 10)
+```
+<br>
+y el de países con mayor expectativa de vida:
+<br>
+```{r}
+data_mundial_2007 %>% 
+    arrange(desc(pobl)) %>% 
+    head(n = 10)
+```
+
+<br>
+
+El único país presente en ambas listas es Japón. Ni nuestro conocimiento del mundo, ni los datos parecen apoyar la noción de que población y longevidad van juntos. Ya hemos usado cor() para obtener una medida de la intensidad de la correlación entre dos variables. Veamos que pasa con longevidad vs. población:
+
+<br>
 
 ```{r}
-
+cor(data_mundial_2007$expVida, data_mundial_2007$pobl)
 ```
+> la correlación es nula. Entonces ¿Por qué aparece en nuestro modelo de regresión lineal?
+
+<br>
+
+En resumidas cuentas, aparece porque nosotros le pedimos que aparezca. Es decir, instruimos en forma específica a `lm()` para que incorpore a la población en el modelo. El caso es que población no es un buen predictor de longevidad (la correlación es bajísima), pero si lo pedimos, lo tenemos: el coeficiente nos indica el valor que minimiza las discrepancias entre valores observado y valores predichos trazando una línea recta. Lo que no indica por si solo es el grado en el cual podemos confiar en esa variable para darnos buenas predicciones o estimados.
+
+<br><br>
+
+Sería muy util que el resultado de `lm()` indique cuáles variables son buenas predictoras y cuáles no. Y por suerte, lo hace cuando lo interrogamos con `summary()`
+
+<br>
 
 ```{r}
-
+summary(modelo_exp_multiple)
 ```
+ Cuanto más bajo el valor p, más significativa es la relación y más estrellitas aparecen: <br>
+
+`.` o nada: No se encuentra una relación entre esta variable y la que queremos predecir. <br>
+`*`: Es muy probable que esta variable tenga una relación con la que queremos predecir. Ya podemos publicar estos resultados en un paper científico. <br>
+`**`: Es muy, pero muy probable que esta variable tenga una relación con la que queremos predecir. 99% seguro. <br>
+`***`: Juramos que las variables estan relacionadas. Más no se puede pedir. <br>
+
+<br>
+
+#### Modelo con tres variables predictoras:
 
 ```{r}
+modelo_exp_multiple <- lm(expVida ~ pobl + PBI_PC + continente, data = data_mundial_2007)
 
+summary(modelo_exp_multiple)
 ```
 
-```{r}
-
-```
+> Observamos que la variable categórica es significativa. Con las demas variables fijas -es decir, en paises de similar PBI y población- el continente de origen explica en gran medida las diferencias en expectativa de vida en cada país, y con un efecto estimado enorme - ¡de 12 a 16 años!-. Notemos de todos modos que el coeficiente de la variable continente había sido mayor en el modelo simple, llegando a casi 26 años para Oceanía. ¿Porqué es menor ahora? Porque nuestro modelo es más completo, y tiene en cuenta más variables. Cuando lo único que teníamos para comparar países era su continente, era era la única variable a la que atribuir diferencias. Ahora que consideramos mútiples variables para explicar las diferencias, notamos la parte de la influencia que se lleva el PBI, reduciendo la del contintente. 
