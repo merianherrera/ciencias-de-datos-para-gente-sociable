@@ -4,51 +4,184 @@ output: html_notebook
 ## **Información geográfica y mapas**
 
 
-```{r}
+```{r echo=FALSE, warning=FALSE}
 library(sf)
 library(tidyverse)
 ```
 
 ```{r}
-
+radios <- st_read("https://bitsandbricks.github.io/data/CABA_rc.geojson")
+summary(radios)
 ```
 
 ```{r}
+ggplot() + geom_sf(data = radios)
+```
 
+<br>
+Visualizar las viviendas:
+<br>
+
+```{r}
+ggplot() + geom_sf(data = radios, aes(fill = POBLACION), color = NA)
 ```
 
 ```{r}
-
+ggplot() + geom_sf(data = radios, aes(fill = BARRIO), color = NA)
 ```
 
 ```{r}
-
+ggplot() + geom_histogram(data = radios, aes(x = AREA_KM2))
 ```
 
 ```{r}
+filtrados <- radios %>% 
+    filter(AREA_KM2 > 2) 
 
+ggplot() + 
+    geom_sf(data = filtrados, aes(fill = BARRIO)) +
+    labs(title = "Radios censales de mayo tamaño")
 ```
 
 ```{r}
+ggplot() + geom_sf(data = radios, aes(fill = VIVIENDAS/HOGARES), color = NA)
+```
 
+<br>
+Hay un radio censal que parece brillar, destacándose entre los demás. ¿Dónde está? Esta vez lo resolvemos en forma analítica en lugar de visual, usando los verbos de transformación de datos. Vamos a definir una variable nueva, con la tasa entre viviendas y hogares que ya usamos para el gráfico. Luego vamos a ordenar el dataframe por orden descendiente de la tasa, y usando `head()` nos quedamos sólo con los primeros valores, que corresponden a los más altos:
+<br>
+
+```{r}
+radios %>% 
+    mutate(viv_vs_hogares = VIVIENDAS / HOGARES) %>% 
+    arrange(desc(viv_vs_hogares)) %>% 
+    head()
+```
+
+<br>
+En lugar de mostrar “número de crímenes por barrio” es más instructivo mostrar el número de crímenes per cápita; de lo contrario es de esperar que los lugares más poblados siempre estén a la cabeza, lo cual no agrega demasiada información.
+<br><br>
+En lugar de mostrar “cantidad de habitantes por radio censal”, suele preferirse mostrar la densidad de población, es decir la cantidad de habitantes dividida por la extensión del área. Los mapas de densidad muestran mucho mejor la distribución espacial de la población.
+<br>
+
+```{r}
+ggplot() + 
+    geom_sf(data = radios, aes(fill = POBLACION/AREA_KM2), color = NA) +
+    scale_fill_viridis_c() +
+    labs(title = "Densidad de población",
+         subtitle = "Ciudad Autónoma de Buenos Aires",
+         fill = "hab/km2")
+```
+
+Este último gráfico representa de forma mucho mas precisa la distribución de habitantes en la ciudad, haciendo saltar a la vista los núcleos con mayor densidad de población. De paso, aprendimos un truco nuevo: agregando `scale_fill_viridis_c()` le pedimos a ggplot que utilice la escala de colores conocida como “viridis”, diseñada por expertos en visualización para ser fácil de leer… y lucir bien.
+
+<br>
+
+### **Volcando en el mapa información de múltiples fuentes**
+
+```{r}
+atencion_ciudadano <- read.csv("http://bitsandbricks.github.io/data/gcba_suaci_comunas.csv")
+names(atencion_ciudadano)
+names(radios)
 ```
 
 ```{r}
-
+barrios_geo <- radios %>% 
+    group_by(BARRIO) %>% 
+    summarise(POBLACION = sum(POBLACION),
+              VIVIENDAS = sum(VIVIENDAS),
+              HOGARES = sum(HOGARES),
+              HOGARES_NBI = sum(HOGARES_NBI),
+              AREA_KM2 = sum(AREA_KM2))
 ```
 
 ```{r}
-
+ggplot() + geom_sf(data = barrios_geo)
 ```
 
 ```{r}
+atencion_por_barrio <- atencion_ciudadano %>% 
+    group_by(BARRIO) %>% 
+    summarise(total = sum(total))
 
+head(atencion_por_barrio, 500)
 ```
 
 ```{r}
+barrios_geo <- barrios_geo %>% left_join(atencion_por_barrio)
+ggplot() + 
+    geom_sf(data = barrios_geo, aes(fill = total/POBLACION)) +
+    labs(title = "Contactos a atención ciudadana per cápita",
+         subtitle = "Barrios de Ciudad Autónoma de Buenos Aires",
+         fill = "contactos/habitante")
+```
 
+<br>
+Normalizar los datos hace evidente que los barrios son parejos en su grado de demanda por habitante, exceptuando los casos salientes que mencionamos antes.
+<br><br>
+Hasta ahora hemos mostrado sobre un mapa variables numéricas, pero es igual de fácil representar variables categóricas. Imaginemos que quisiéramos mostrar el principal rubro por el cual se comunican los ciudadanos en cada barrio.
+<br><br>
+
+Usando los verbos de transformación que conocemos, la receta sería:
+<br><br>
+1. Agrupar los datos por barrio y por rubro<br>
+2. Crear un resumen con el total de contactos por rubro en cada barrio<br>
+3. Por cada grupo, filtrar los datos para conservar sólo el rubro que tiene la cantidad más grande de contactos<br>
+<br>
+
+```{r}
+atencion_por_barrio_principal_rubro <- atencion_ciudadano %>% 
+    group_by(BARRIO, RUBRO) %>% 
+    summarise(contactos = sum(total)) %>% 
+    filter(contactos == max(contactos))
+
+head(atencion_por_barrio_principal_rubro, 400)
 ```
 
 ```{r}
-
+barrios_geo <- barrios_geo %>% left_join(atencion_por_barrio_principal_rubro)
+ggplot() + 
+    geom_sf(data = barrios_geo, aes(fill = RUBRO)) +
+    labs(title = "Principal categoría de las solicitudes/reclamos")
 ```
+<br>
+
+### Combinando capas geográficas
+
+<br>
+
+```{r}
+# las líneas de transporte subterráneo (SUBTE) de la ciudad
+subte_lineas <- st_read("http://bitsandbricks.github.io/data/subte_lineas.geojson")
+
+# y los puntos con las ubicaciones de las estaciones de SUBTE
+subte_estaciones <- st_read("http://bitsandbricks.github.io/data/subte_estaciones.geojson")
+```
+
+```{r}
+ggplot() +
+    geom_sf(data = barrios_geo) +
+    geom_sf(data = subte_lineas, color = "yellow") +
+    geom_sf(data = subte_estaciones, color = "orange") +
+    labs(title = "Sistema de transporte subterráneo (SUBTE)",
+         subtitle = "Ciudad de Buenos Aires")
+```
+
+```{r}
+emergencias_en_subte <- atencion_ciudadano %>% 
+    filter(RUBRO == "EMERGENCIAS EN SUBTE") %>% 
+    group_by(BARRIO) %>% 
+    summarise(emergencias = sum(total))
+
+barrios_geo <- barrios_geo %>% left_join(emergencias_en_subte)
+
+ggplot() +
+    geom_sf(data = barrios_geo, aes(fill = emergencias)) +
+    geom_sf(data = subte_lineas, color = "yellow") +
+    geom_sf(data = subte_estaciones, color = "orange") +
+    labs(title = "Emergencias relacionadas con el SUBTE",
+         subtitle = "Registros de atención al ciudadano, Ciudad de Buenos Aires (2015 - 2017)",
+         fill = "emergencias reportadas")
+```
+
+> Aquí se cumplen las expectativas: la cantidad de emergencias reportadas sigue en forma clara un patrón relacionado con la cantidad de estaciones ubicadas en cada barrio. Y como era de esperarse, en barrios donde el SUBTE no ofrece cobertura la cantidad de emergencias es nula.
